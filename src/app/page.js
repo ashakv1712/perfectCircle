@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 
 export default function PerfectCircle() {
   const canvasRef = useRef(null);
@@ -18,30 +19,24 @@ export default function PerfectCircle() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [showNameInput, setShowNameInput] = useState(false);
 
-  // Mock Supabase client
-  const supabase = {
-    from: () => ({
-      select: () => ({
-        order: () => ({
-          limit: () => Promise.resolve({ data: [] })
-        })
-      }),
-      insert: () => Promise.resolve({ error: null })
-    })
-  };
-
   // Fetch leaderboard
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('scores')
           .select('name, score')
           .order('score', { ascending: false })
           .limit(5);
+        
+        if (error) {
+          console.error('Error fetching leaderboard:', error);
+          return;
+        }
+        
         setLeaderboard(data || []);
       } catch (error) {
-        console.log('Supabase not configured');
+        console.error('Error fetching leaderboard:', error);
       }
     };
     fetchLeaderboard();
@@ -247,58 +242,58 @@ export default function PerfectCircle() {
     return true;
   };
 
-const calculateAdvancedCircularityScore = (pathPoints, centerX, centerY, canvasWidth) => {
-  if (pathPoints.length < 20) return 0;
-  
-  // 1. Calculate the center of the drawn shape
-  let sumX = 0, sumY = 0;
-  pathPoints.forEach(point => {
-    sumX += point.x;
-    sumY += point.y;
-  });
-  const shapeCenter = { x: sumX / pathPoints.length, y: sumY / pathPoints.length };
-  
-  // 2. Calculate distances from shape center
-  const distances = pathPoints.map(point => 
-    Math.sqrt(Math.pow(point.x - shapeCenter.x, 2) + Math.pow(point.y - shapeCenter.y, 2))
-  );
-  
-  // 3. Calculate average radius and standard deviation
-  const avgRadius = distances.reduce((sum, d) => sum + d, 0) / distances.length;
-  const variance = distances.reduce((sum, d) => sum + Math.pow(d - avgRadius, 2), 0) / distances.length;
-  const standardDeviation = Math.sqrt(variance);
-  
-  // 4. Check for line-like or square-like patterns
-  const linearityPenalty = calculateLinearityPenalty(pathPoints);
-  const squarenessPenalty = calculateSquarenessPenalty(pathPoints, shapeCenter);
-  
-  // 5. Calculate closure bonus
-  const closureBonus = calculateClosureBonus(pathPoints);
-  
-  // 6. Check if shape actually goes around the center
-  const enclosurePenalty = calculateEnclosurePenalty(pathPoints, centerX, centerY);
-  
-  // 7. Base score from radius consistency
-  const radiusConsistency = Math.max(0, 100 - (standardDeviation / avgRadius) * 150);
-  
-  // 8. Apply adjustments
-  let rawScore = radiusConsistency;
-  rawScore -= linearityPenalty * 0.3;
-  rawScore -= squarenessPenalty * 0.3;
-  rawScore += closureBonus;
-  rawScore -= enclosurePenalty * 0.4;
-  
-  // Ensure minimum score of 80% for properly closed circles
-  const isWellClosed = closureBonus > 15; // More than 75% of max closure bonus
-  const hasGoodRotation = enclosurePenalty === 0;
-  
-  if (isWellClosed && hasGoodRotation) {
-    rawScore = Math.max(rawScore, 80); // Minimum 80% for properly closed circles
-  }
-  
-  // Cap at 99% to keep 100% very rare but possible
-  return Math.min(rawScore, 99);
-};
+  const calculateAdvancedCircularityScore = (pathPoints, centerX, centerY, canvasWidth) => {
+    if (pathPoints.length < 20) return 0;
+    
+    // 1. Calculate the center of the drawn shape
+    let sumX = 0, sumY = 0;
+    pathPoints.forEach(point => {
+      sumX += point.x;
+      sumY += point.y;
+    });
+    const shapeCenter = { x: sumX / pathPoints.length, y: sumY / pathPoints.length };
+    
+    // 2. Calculate distances from shape center
+    const distances = pathPoints.map(point => 
+      Math.sqrt(Math.pow(point.x - shapeCenter.x, 2) + Math.pow(point.y - shapeCenter.y, 2))
+    );
+    
+    // 3. Calculate average radius and standard deviation
+    const avgRadius = distances.reduce((sum, d) => sum + d, 0) / distances.length;
+    const variance = distances.reduce((sum, d) => sum + Math.pow(d - avgRadius, 2), 0) / distances.length;
+    const standardDeviation = Math.sqrt(variance);
+    
+    // 4. Check for line-like or square-like patterns
+    const linearityPenalty = calculateLinearityPenalty(pathPoints);
+    const squarenessPenalty = calculateSquarenessPenalty(pathPoints, shapeCenter);
+    
+    // 5. Calculate closure bonus
+    const closureBonus = calculateClosureBonus(pathPoints);
+    
+    // 6. Check if shape actually goes around the center
+    const enclosurePenalty = calculateEnclosurePenalty(pathPoints, centerX, centerY);
+    
+    // 7. Base score from radius consistency
+    const radiusConsistency = Math.max(0, 100 - (standardDeviation / avgRadius) * 150);
+    
+    // 8. Apply adjustments
+    let rawScore = radiusConsistency;
+    rawScore -= linearityPenalty * 0.3;
+    rawScore -= squarenessPenalty * 0.3;
+    rawScore += closureBonus;
+    rawScore -= enclosurePenalty * 0.4;
+    
+    // Ensure minimum score of 80% for properly closed circles
+    const isWellClosed = closureBonus > 15; // More than 75% of max closure bonus
+    const hasGoodRotation = enclosurePenalty === 0;
+    
+    if (isWellClosed && hasGoodRotation) {
+      rawScore = Math.max(rawScore, 80); // Minimum 80% for properly closed circles
+    }
+    
+    // Cap at 99% to keep 100% very rare but possible
+    return Math.min(rawScore, 99);
+  };
 
   const calculateLinearityPenalty = (pathPoints) => {
     if (pathPoints.length < 10) return 0;
@@ -347,24 +342,24 @@ const calculateAdvancedCircularityScore = (pathPoints, centerX, centerY, canvasW
   };
 
   const calculateClosureBonus = (pathPoints) => {
-  if (pathPoints.length < 10) return 0;
-  
-  const start = pathPoints[0];
-  const end = pathPoints[pathPoints.length - 1];
-  const distance = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
-  
-  const avgDistance = pathPoints.reduce((sum, point, i) => {
-    if (i === 0) return sum;
-    const prev = pathPoints[i - 1];
-    return sum + Math.sqrt(Math.pow(point.x - prev.x, 2) + Math.pow(point.y - prev.y, 2));
-  }, 0) / (pathPoints.length - 1);
-  
-  // Calculate closure quality (0-1) where 1 is perfectly closed
-  const closureQuality = 1 - Math.min(distance / (avgDistance * 0.5), 1);
-  
-  // Return a bonus between 0-20 points based on closure quality
-  return closureQuality * 20;
-};
+    if (pathPoints.length < 10) return 0;
+    
+    const start = pathPoints[0];
+    const end = pathPoints[pathPoints.length - 1];
+    const distance = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
+    
+    const avgDistance = pathPoints.reduce((sum, point, i) => {
+      if (i === 0) return sum;
+      const prev = pathPoints[i - 1];
+      return sum + Math.sqrt(Math.pow(point.x - prev.x, 2) + Math.pow(point.y - prev.y, 2));
+    }, 0) / (pathPoints.length - 1);
+    
+    // Calculate closure quality (0-1) where 1 is perfectly closed
+    const closureQuality = 1 - Math.min(distance / (avgDistance * 0.5), 1);
+    
+    // Return a bonus between 0-20 points based on closure quality
+    return closureQuality * 20;
+  };
 
   const calculateEnclosurePenalty = (pathPoints, centerX, centerY) => {
     let angleSum = 0;
@@ -444,19 +439,23 @@ const calculateAdvancedCircularityScore = (pathPoints, centerX, centerY, canvasW
           score: score 
         }]);
       
-      if (!error) {
-        const { data } = await supabase
-          .from('scores')
-          .select('name, score')
-          .order('score', { ascending: false })
-          .limit(5);
-        setLeaderboard(data || []);
-        
-        setShowNameInput(false);
-        setName('');
+      if (error) {
+        console.error('Error submitting score:', error);
+        return;
       }
+      
+      // Refresh leaderboard after submission
+      const { data } = await supabase
+        .from('scores')
+        .select('name, score')
+        .order('score', { ascending: false })
+        .limit(5);
+      
+      setLeaderboard(data || []);
+      setShowNameInput(false);
+      setName('');
     } catch (error) {
-      console.log('Supabase not configured');
+      console.error('Error submitting score:', error);
       setShowNameInput(false);
       setName('');
     }
